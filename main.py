@@ -139,7 +139,11 @@ class PlayerBackend(QObject):
     @Slot(str)
     def loadVideo(self, filepath):
         if filepath.startswith("file://"):
-            filepath = filepath[7:] # Remove file:// prefix for local OS checks
+            filepath = QUrl(filepath).toLocalFile()
+            
+        # On Windows, sometimes an extra leading slash remains (e.g. /E:/path)
+        if os.name == 'nt' and filepath.startswith('/') and len(filepath) > 2 and filepath[2] == ':':
+            filepath = filepath[1:]
             
         self._currentVideoUrl = QUrl.fromLocalFile(filepath)
         self.currentVideoUrlChanged.emit()
