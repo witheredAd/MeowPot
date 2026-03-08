@@ -2,6 +2,10 @@
 
 > A modern, sleek, and subtitle-first local video player built with Python, PySide6, and QML. (一个基于 Python、PySide6 和 QML 构建的现代化、美观且字幕优先的本地视频播放器。)
 
+> [!Warning]
+> This app is vibe-built. The app itself is usable now, but this `README.md` needs review.
+> 该软件是 Vibe-Coding 完成的，其已可使用，但描述文件尚待检查。
+
 MeowPot is a beautiful and modern local video player highlighting a sleek "liquid glass"-inspired dark UI, built-in subtitle parsing, state persistence, and native keyboard hotkeys.
 
 ## ✨ Features
@@ -13,7 +17,7 @@ MeowPot is a beautiful and modern local video player highlighting a sleek "liqui
 - **Advanced Hotkeys**: 
   - `Space` to Play/Pause.
   - `Left` / `Right` arrows to seek.
-  - Hold `Left` / `Right` arrows for dynamic fast-forward and fast-backward playback speeds.
+  - [ ] Hold `Left` / `Right` arrows for dynamic fast-forward and fast-backward playback speeds. (Not implemented yet)
 
 ## 🛠️ Requirements
 
@@ -28,14 +32,24 @@ MeowPot is a beautiful and modern local video player highlighting a sleek "liqui
    cd meowpot
    ```
 
-2. Install the required dependencies (using `pip` or `uv`):
+2. Install the required dependencies:
    ```bash
    pip install PySide6
    ```
 
-3. Run the application:
+   or uv:
+   ```bash
+   uv sync
+   ```
+
+4. Run the application:
    ```bash
    python main.py
+   ```
+   
+   or uv:
+   ```bash
+   uv run main.py
    ```
 
 ## 🎮 Usage
