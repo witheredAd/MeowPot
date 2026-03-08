@@ -174,7 +174,9 @@ class ConfigManager(QObject):
             "windowWidth": 1200,
             "windowHeight": 800,
             "rightPanelWidth": 400,
-            "subtitlesHeight": 400
+            "subtitlesHeight": 400,
+            "rightPanelVisible": True,
+            "playlistVisible": True
         }
         self.load()
 
@@ -197,6 +199,50 @@ class ConfigManager(QObject):
     windowHeightChanged = Signal()
     rightPanelWidthChanged = Signal()
     subtitlesHeightChanged = Signal()
+    lastVideoPathChanged = Signal()
+    lastVideoPositionChanged = Signal()
+    rightPanelVisibleChanged = Signal()
+    playlistVisibleChanged = Signal()
+
+    @Property(bool, notify=rightPanelVisibleChanged)
+    def rightPanelVisible(self):
+        return self._config.get("rightPanelVisible", True)
+
+    @rightPanelVisible.setter
+    def rightPanelVisible(self, v):
+        self._config["rightPanelVisible"] = v
+        self.save()
+        self.rightPanelVisibleChanged.emit()
+
+    @Property(bool, notify=playlistVisibleChanged)
+    def playlistVisible(self):
+        return self._config.get("playlistVisible", True)
+
+    @playlistVisible.setter
+    def playlistVisible(self, v):
+        self._config["playlistVisible"] = v
+        self.save()
+        self.playlistVisibleChanged.emit()
+
+    @Property(int, notify=lastVideoPositionChanged)
+    def lastVideoPosition(self):
+        return self._config.get("lastVideoPosition", 0)
+
+    @lastVideoPosition.setter
+    def lastVideoPosition(self, v):
+        self._config["lastVideoPosition"] = v
+        self.save()
+        self.lastVideoPositionChanged.emit()
+
+    @Property(str, notify=lastVideoPathChanged)
+    def lastVideoPath(self):
+        return self._config.get("lastVideoPath", "")
+
+    @lastVideoPath.setter
+    def lastVideoPath(self, v):
+        self._config["lastVideoPath"] = v
+        self.save()
+        self.lastVideoPathChanged.emit()
 
     @Property(int, notify=windowWidthChanged)
     def windowWidth(self):

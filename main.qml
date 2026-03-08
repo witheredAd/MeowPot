@@ -18,14 +18,25 @@ ApplicationWindow {
         config.windowHeight = window.height;
         config.rightPanelWidth = rightPanel.SplitView.preferredWidth;
         config.subtitlesHeight = subtitlesPanel.SplitView.preferredHeight;
+        config.lastVideoPath = backend.currentVideoUrl.toString();
+        config.lastVideoPosition = player.position;
+        config.rightPanelVisible = window.rightPanelVisible;
+        config.playlistVisible = window.playlistVisible;
+    }
+
+    Component.onCompleted: {
+        if (config.lastVideoPath !== "") {
+            backend.loadVideo(config.lastVideoPath);
+        }
     }
 
     // Material theme settings natively available in QML
     Material.theme: Material.Dark
     Material.accent: Material.LightBlue
 
-    property bool rightPanelVisible: true
+    property bool rightPanelVisible: config.rightPanelVisible
     property bool controlBarVisible: true
+    property bool playlistVisible: config.playlistVisible
 
     Item {
         id: hotkeyHandler
@@ -141,7 +152,8 @@ ApplicationWindow {
                         source: backend.currentVideoUrl
                         audioOutput: AudioOutput {}
                         videoOutput: videoOutput
-                        
+                        property bool positionRestored: false
+
                         onPositionChanged: {
                             if (!progressSlider.pressed) {
                                 progressSlider.value = player.position
@@ -150,6 +162,14 @@ ApplicationWindow {
                         }
                         onDurationChanged: {
                             progressSlider.to = player.duration
+                        }
+                        onMediaStatusChanged: {
+                            if (mediaStatus === MediaPlayer.LoadedMedia || mediaStatus === MediaPlayer.BufferedMedia) {
+                                if (!positionRestored && config.lastVideoPath !== "" && backend.currentVideoUrl.toString() === config.lastVideoPath && config.lastVideoPosition > 0) {
+                                    player.position = config.lastVideoPosition;
+                                    positionRestored = true;
+                                }
+                            }
                         }
                     }
 
@@ -342,6 +362,37 @@ ApplicationWindow {
                         }
 
                         Button {
+                            id: playlistBtn
+                            Layout.preferredWidth: 40
+                            Layout.preferredHeight: 40
+                            focusPolicy: Qt.NoFocus
+                            padding: 0
+                            background: Rectangle {
+                                radius: 20
+                                color: playlistBtn.down ? Qt.rgba(1, 1, 1, 0.2) : (playlistBtn.hovered ? Qt.rgba(1, 1, 1, 0.1) : "transparent")
+                                Behavior on color { ColorAnimation { duration: 150 } }
+                            }
+                            onClicked: window.playlistVisible = !window.playlistVisible
+                            contentItem: Canvas {
+                                id: togglePlaylistCanvas
+                                anchors.fill: parent
+                                Connections {
+                                    target: window
+                                    function onPlaylistVisibleChanged() { togglePlaylistCanvas.requestPaint() }
+                                }
+                                onPaint: {
+                                    var ctx = getContext("2d"); ctx.clearRect(0,0,width,height); 
+                                    ctx.fillStyle = window.playlistVisible ? "white" : "gray"; 
+                                    ctx.beginPath();
+                                    ctx.rect(10, 14, 4, 2); ctx.rect(16, 14, 14, 2);
+                                    ctx.rect(10, 19, 4, 2); ctx.rect(16, 19, 14, 2);
+                                    ctx.rect(10, 24, 4, 2); ctx.rect(16, 24, 14, 2);
+                                    ctx.fill();
+                                }
+                            }
+                        }
+
+                        Button {
                             id: rightPanelBtn
                             Layout.preferredWidth: 40
                             Layout.preferredHeight: 40
@@ -462,6 +513,8 @@ ApplicationWindow {
 
                 // Playlist
                 Rectangle {
+                    id: playlistPanel
+                    visible: window.playlistVisible
                     SplitView.preferredHeight: 300
                     color: "#252526"
 

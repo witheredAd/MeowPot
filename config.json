@@ -2,5 +2,9 @@
     "windowWidth": 1982,
     "windowHeight": 1083,
     "rightPanelWidth": 357,
-    "subtitlesHeight": 400
+    "subtitlesHeight": 400,
+    "rightPanelVisible": true,
+    "playlistVisible": false,
+    "lastVideoPath": "file:///home/rin/Downloads/\u7b2c\u4e00\u5468 \u57fa\u7840\u6848\u4f8b\u4e00\u4e2d\u9ad8\u6a21\u5236\u4f5c\u8bb2\u89e301_2.mp4",
+    "lastVideoPosition": 1364800
 }
