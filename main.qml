@@ -17,6 +17,16 @@ ApplicationWindow {
     Material.theme: Material.Dark
     Material.accent: Material.LightBlue
 
+    property bool rightPanelVisible: true
+    property bool controlBarVisible: true
+
+    Timer {
+        id: hideControlsTimer
+        interval: 3000
+        running: true
+        onTriggered: controlBarVisible = false
+    }
+
     SplitView {
         anchors.fill: parent
         orientation: Qt.Horizontal
@@ -26,17 +36,19 @@ ApplicationWindow {
             SplitView.fillWidth: true
             SplitView.minimumWidth: 400
 
-            ColumnLayout {
+            Rectangle {
                 anchors.fill: parent
-                spacing: 0
+                color: "black"
 
-                // Video Area
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    color: "black"
+                HoverHandler {
+                    id: videoHover
+                    onPointChanged: {
+                        window.controlBarVisible = true
+                        hideControlsTimer.restart()
+                    }
+                }
 
-                    MediaPlayer {
+                MediaPlayer {
                         id: player
                         source: backend.currentVideoUrl
                         audioOutput: AudioOutput {}
@@ -64,7 +76,8 @@ ApplicationWindow {
                         id: subtitleOverlay
                         visible: backend.currentSubtitleText !== ""
                         anchors.bottom: parent.bottom
-                        anchors.bottomMargin: 30
+                        anchors.bottomMargin: window.controlBarVisible ? 90 : 30
+                        Behavior on anchors.bottomMargin { NumberAnimation { duration: 300 } }
                         anchors.horizontalCenter: parent.horizontalCenter
                         width: Math.min(subtitleText.paintedWidth + 40, parent.width - 40)
                         height: subtitleText.paintedHeight + 20
@@ -82,15 +95,31 @@ ApplicationWindow {
                             width: parent.width - 40
                         }
                     }
-                }
 
                 // Controls Area
                 Rectangle {
-                    Layout.fillWidth: true
+                    anchors.bottom: parent.bottom
+                    anchors.left: parent.left
+                    anchors.right: parent.right
                     height: 60
-                    color: "#252526"
+                    color: Qt.rgba(0.145, 0.145, 0.149, 0.85) // Transparent dark background
                     border.color: "#333333"
                     border.width: 1
+                    opacity: window.controlBarVisible ? 1.0 : 0.0
+                    visible: opacity > 0
+                    Behavior on opacity { NumberAnimation { duration: 300 } }
+
+                    HoverHandler {
+                        id: controlsHover
+                        onHoveredChanged: {
+                            if (hovered) {
+                                window.controlBarVisible = true
+                                hideControlsTimer.stop()
+                            } else {
+                                hideControlsTimer.restart()
+                            }
+                        }
+                    }
 
                     RowLayout {
                         anchors.fill: parent
@@ -98,7 +127,8 @@ ApplicationWindow {
                         spacing: 15
 
                         Button {
-                            text: player.playbackState === MediaPlayer.PlayingState ? "Pause" : "Play"
+                            text: player.playbackState === MediaPlayer.PlayingState ? "⏸" : "▶"
+                            font.pixelSize: 20
                             onClicked: {
                                 if (player.playbackState === MediaPlayer.PlayingState)
                                     player.pause()
@@ -132,8 +162,15 @@ ApplicationWindow {
                         }
 
                         Button {
-                            text: "Open"
+                            text: "📂"
+                            font.pixelSize: 20
                             onClicked: fileDialog.open()
+                        }
+
+                        Button {
+                            text: window.rightPanelVisible ? "⯈" : "⯇"
+                            font.pixelSize: 20
+                            onClicked: window.rightPanelVisible = !window.rightPanelVisible
                         }
                     }
                 }
@@ -142,6 +179,7 @@ ApplicationWindow {
 
         // --- Right Panel: Subtitles & Playlist ---
         Item {
+            visible: window.rightPanelVisible
             SplitView.preferredWidth: 400
             SplitView.minimumWidth: 200
 
