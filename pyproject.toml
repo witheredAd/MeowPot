@@ -1,0 +1,15 @@
+[project]
+name = "meowpot"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pyside6>=6.10.2",
+    "pysrt>=1.1.2",
+    "webvtt-py>=0.5.1",
+]
+
+[[tool.uv.index]]
+url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple"
+default = true
