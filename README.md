@@ -4,6 +4,7 @@
 
 > [!Warning]
 > This app is vibe-built. The app itself is usable now, but this `README.md` needs review.
+> 
 > 该软件是 Vibe-Coding 完成的，其已可使用，但描述文件尚待检查。
 
 MeowPot is a beautiful and modern local video player highlighting a sleek "liquid glass"-inspired dark UI, built-in subtitle parsing, state persistence, and native keyboard hotkeys.
