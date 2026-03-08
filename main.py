@@ -164,6 +164,80 @@ class PlayerBackend(QObject):
             self._activeSubtitleIndex = index
             self.activeSubtitleIndexChanged.emit()
 
+import json
+
+class ConfigManager(QObject):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+        self._config = {
+            "windowWidth": 1200,
+            "windowHeight": 800,
+            "rightPanelWidth": 400,
+            "subtitlesHeight": 400
+        }
+        self.load()
+
+    def load(self):
+        if os.path.exists(self.config_path):
+            try:
+                with open(self.config_path, 'r') as f:
+                    self._config.update(json.load(f))
+            except Exception:
+                pass
+
+    def save(self):
+        try:
+            with open(self.config_path, 'w') as f:
+                json.dump(self._config, f, indent=4)
+        except Exception:
+            pass
+
+    windowWidthChanged = Signal()
+    windowHeightChanged = Signal()
+    rightPanelWidthChanged = Signal()
+    subtitlesHeightChanged = Signal()
+
+    @Property(int, notify=windowWidthChanged)
+    def windowWidth(self):
+        return self._config.get("windowWidth", 1200)
+
+    @windowWidth.setter
+    def windowWidth(self, v):
+        self._config["windowWidth"] = v
+        self.save()
+        self.windowWidthChanged.emit()
+
+    @Property(int, notify=windowHeightChanged)
+    def windowHeight(self):
+        return self._config.get("windowHeight", 800)
+
+    @windowHeight.setter
+    def windowHeight(self, v):
+        self._config["windowHeight"] = v
+        self.save()
+        self.windowHeightChanged.emit()
+
+    @Property(int, notify=rightPanelWidthChanged)
+    def rightPanelWidth(self):
+        return self._config.get("rightPanelWidth", 400)
+
+    @rightPanelWidth.setter
+    def rightPanelWidth(self, v):
+        self._config["rightPanelWidth"] = v
+        self.save()
+        self.rightPanelWidthChanged.emit()
+
+    @Property(int, notify=subtitlesHeightChanged)
+    def subtitlesHeight(self):
+        return self._config.get("subtitlesHeight", 400)
+
+    @subtitlesHeight.setter
+    def subtitlesHeight(self, v):
+        self._config["subtitlesHeight"] = v
+        self.save()
+        self.subtitlesHeightChanged.emit()
+
 
 if __name__ == "__main__":
     app = QGuiApplication(sys.argv)
@@ -173,11 +247,13 @@ if __name__ == "__main__":
     
     # Instantiate our python backend controller
     backend = PlayerBackend()
+    config = ConfigManager()
     
     # Expose the backend and models to the QML context
     engine.rootContext().setContextProperty("backend", backend)
     engine.rootContext().setContextProperty("playlistModel", backend.playlistModel)
     engine.rootContext().setContextProperty("subtitleModel", backend.subtitleModel)
+    engine.rootContext().setContextProperty("config", config)
     
     # Load the main.qml file which we are about to create
     qml_file = os.path.join(os.path.dirname(__file__), "main.qml")

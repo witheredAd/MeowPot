@@ -8,10 +8,17 @@ import QtQuick.Dialogs
 ApplicationWindow {
     id: window
     visible: true
-    width: 1200
-    height: 800
+    width: config.windowWidth
+    height: config.windowHeight
     title: "MeowPot"
     color: "#1e1e1e"
+
+    onClosing: {
+        config.windowWidth = window.width;
+        config.windowHeight = window.height;
+        config.rightPanelWidth = rightPanel.SplitView.preferredWidth;
+        config.subtitlesHeight = subtitlesPanel.SplitView.preferredHeight;
+    }
 
     // Material theme settings natively available in QML
     Material.theme: Material.Dark
@@ -20,11 +27,89 @@ ApplicationWindow {
     property bool rightPanelVisible: true
     property bool controlBarVisible: true
 
+    Item {
+        id: hotkeyHandler
+        anchors.fill: parent
+        focus: true
+
+        property bool rightPressed: false
+        property bool leftPressed: false
+        property real activeSpeed: parseFloat(speedCombo.currentText)
+
+        Keys.onSpacePressed: (event) => {
+            if (player.playbackState === MediaPlayer.PlayingState) player.pause();
+            else player.play();
+            event.accepted = true;
+        }
+
+        Keys.onPressed: (event) => {
+            if (event.isAutoRepeat) { event.accepted = true; return; }
+            if (event.key === Qt.Key_Right) {
+                hotkeyHandler.rightPressed = true;
+                fastForwardTimer.start();
+                event.accepted = true;
+            } else if (event.key === Qt.Key_Left) {
+                hotkeyHandler.leftPressed = true;
+                fastBackwardTimer.start();
+                event.accepted = true;
+            }
+        }
+
+        Keys.onReleased: (event) => {
+            if (event.isAutoRepeat) { event.accepted = true; return; }
+            if (event.key === Qt.Key_Right) {
+                fastForwardTimer.stop();
+                if (hotkeyHandler.rightPressed) {
+                    hotkeyHandler.rightPressed = false;
+                    if (player.playbackRate > hotkeyHandler.activeSpeed + 1.0) {
+                        player.playbackRate = hotkeyHandler.activeSpeed;
+                    } else {
+                        player.position = Math.min(player.position + 10000, player.duration);
+                    }
+                }
+                event.accepted = true;
+            } else if (event.key === Qt.Key_Left) {
+                fastBackwardTimer.stop();
+                if (hotkeyHandler.leftPressed) {
+                    hotkeyHandler.leftPressed = false;
+                    if (player.playbackRate !== hotkeyHandler.activeSpeed) {
+                        player.playbackRate = hotkeyHandler.activeSpeed;
+                    } else {
+                        player.position = Math.max(0, player.position - 10000);
+                    }
+                }
+                event.accepted = true;
+            }
+        }
+
+        Timer {
+            id: fastForwardTimer
+            interval: 300
+            onTriggered: {
+                if (hotkeyHandler.rightPressed) player.playbackRate = hotkeyHandler.activeSpeed + 2.0;
+            }
+        }
+
+        Timer {
+            id: fastBackwardTimer
+            interval: 300
+            onTriggered: {
+                if (hotkeyHandler.leftPressed) player.playbackRate = -(hotkeyHandler.activeSpeed + 2.0);
+            }
+        }
+    }
+
     Timer {
         id: hideControlsTimer
-        interval: 3000
+        interval: 2000
         running: true
-        onTriggered: controlBarVisible = false
+        onTriggered: {
+            if (controlBarHover.hovered) {
+                hideControlsTimer.restart()
+            } else {
+                controlBarVisible = false
+            }
+        }
     }
 
     SplitView {
@@ -42,7 +127,10 @@ ApplicationWindow {
 
                 HoverHandler {
                     id: videoHover
+                    property point lastPos: Qt.point(-1, -1)
                     onPointChanged: {
+                        if (Math.abs(point.position.x - lastPos.x) < 1 && Math.abs(point.position.y - lastPos.y) < 1) return;
+                        lastPos = point.position;
                         window.controlBarVisible = true
                         hideControlsTimer.restart()
                     }
@@ -109,15 +197,15 @@ ApplicationWindow {
                     visible: opacity > 0
                     Behavior on opacity { NumberAnimation { duration: 300 } }
 
+
                     HoverHandler {
-                        id: controlsHover
-                        onHoveredChanged: {
-                            if (hovered) {
-                                window.controlBarVisible = true
-                                hideControlsTimer.stop()
-                            } else {
-                                hideControlsTimer.restart()
-                            }
+                        id: controlBarHover
+                        property point lastPos: Qt.point(-1, -1)
+                        onPointChanged: {
+                            if (Math.abs(point.position.x - lastPos.x) < 1 && Math.abs(point.position.y - lastPos.y) < 1) return;
+                            lastPos = point.position;
+                            window.controlBarVisible = true
+                            hideControlsTimer.restart()
                         }
                     }
 
@@ -127,18 +215,55 @@ ApplicationWindow {
                         spacing: 15
 
                         Button {
-                            text: player.playbackState === MediaPlayer.PlayingState ? "⏸" : "▶"
-                            font.pixelSize: 20
+                            Layout.preferredWidth: 32
+                            Layout.preferredHeight: 32
+                            focusPolicy: Qt.NoFocus
+                            padding: 0
                             onClicked: {
                                 if (player.playbackState === MediaPlayer.PlayingState)
                                     player.pause()
                                 else
                                     player.play()
                             }
+                            contentItem: Item {
+                                anchors.fill: parent
+                                Component.onCompleted: {
+                                    if (player.playbackState === MediaPlayer.PlayingState) pauseRects.visible = true
+                                    else playCanvas.visible = true
+                                }
+                                Connections {
+                                    target: player
+                                    function onPlaybackStateChanged() {
+                                        if (player.playbackState === MediaPlayer.PlayingState) {
+                                            pauseRects.visible = true; playCanvas.visible = false;
+                                        } else {
+                                            pauseRects.visible = false; playCanvas.visible = true;
+                                        }
+                                    }
+                                }
+                                Canvas {
+                                    id: playCanvas
+                                    anchors.fill: parent
+                                    visible: false
+                                    onPaint: {
+                                        var ctx = getContext("2d"); ctx.fillStyle = "white"; ctx.beginPath();
+                                        ctx.moveTo(10, 8); ctx.lineTo(24, 16); ctx.lineTo(10, 24); ctx.fill();
+                                    }
+                                }
+                                Row {
+                                    id: pauseRects
+                                    anchors.centerIn: parent
+                                    spacing: 4
+                                    visible: false
+                                    Rectangle { width: 4; height: 16; color: "white" }
+                                    Rectangle { width: 4; height: 16; color: "white" }
+                                }
+                            }
                         }
 
                         Slider {
                             id: progressSlider
+                            focusPolicy: Qt.NoFocus
                             Layout.fillWidth: true
                             from: 0
                             to: 0
@@ -152,25 +277,53 @@ ApplicationWindow {
                         }
 
                         ComboBox {
+                            id: speedCombo
+                            focusPolicy: Qt.NoFocus
                             model: ["1.0x", "1.5x", "2.0x", "2.5x", "3.0x"]
                             onCurrentTextChanged: {
                                 let match = currentText.match(/(\d+\.\d+)/);
-                                if (match) {
+                                if (match && !hotkeyHandler.rightPressed && !hotkeyHandler.leftPressed) {
                                     player.playbackRate = parseFloat(match[1]);
                                 }
                             }
                         }
 
                         Button {
-                            text: "📂"
-                            font.pixelSize: 20
+                            Layout.preferredWidth: 32
+                            Layout.preferredHeight: 32
+                            focusPolicy: Qt.NoFocus
+                            padding: 0
                             onClicked: fileDialog.open()
+                            contentItem: Item {
+                                anchors.fill: parent
+                                Rectangle { x: 6; y: 8; width: 8; height: 3; color: "white"; radius: 1 }
+                                Rectangle { x: 6; y: 10; width: 20; height: 14; color: "white"; radius: 2 }
+                            }
                         }
 
                         Button {
-                            text: window.rightPanelVisible ? "⯈" : "⯇"
-                            font.pixelSize: 20
+                            Layout.preferredWidth: 32
+                            Layout.preferredHeight: 32
+                            focusPolicy: Qt.NoFocus
+                            padding: 0
                             onClicked: window.rightPanelVisible = !window.rightPanelVisible
+                            contentItem: Canvas {
+                                id: toggleRightPanelCanvas
+                                anchors.fill: parent
+                                Connections {
+                                    target: window
+                                    function onRightPanelVisibleChanged() { toggleRightPanelCanvas.requestPaint() }
+                                }
+                                onPaint: {
+                                    var ctx = getContext("2d"); ctx.clearRect(0,0,width,height); ctx.fillStyle = "white"; ctx.beginPath();
+                                    if (window.rightPanelVisible) {
+                                        ctx.moveTo(20, 10); ctx.lineTo(12, 16); ctx.lineTo(20, 22);
+                                    } else {
+                                        ctx.moveTo(12, 10); ctx.lineTo(20, 16); ctx.lineTo(12, 22);
+                                    }
+                                    ctx.fill()
+                                }
+                            }
                         }
                     }
                 }
@@ -179,8 +332,9 @@ ApplicationWindow {
 
         // --- Right Panel: Subtitles & Playlist ---
         Item {
+            id: rightPanel
             visible: window.rightPanelVisible
-            SplitView.preferredWidth: 400
+            SplitView.preferredWidth: config.rightPanelWidth ? config.rightPanelWidth : 400
             SplitView.minimumWidth: 200
 
             SplitView {
@@ -189,7 +343,9 @@ ApplicationWindow {
 
                 // Subtitles List
                 Rectangle {
+                    id: subtitlesPanel
                     SplitView.fillHeight: true
+                    SplitView.preferredHeight: config.subtitlesHeight ? config.subtitlesHeight : 400
                     color: "#252526"
 
                     ColumnLayout {
@@ -211,6 +367,7 @@ ApplicationWindow {
 
                         ListView {
                             id: subtitlesListView
+                            focus: false
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             model: subtitleModel
@@ -237,6 +394,8 @@ ApplicationWindow {
                                     hoverEnabled: true
                                     onClicked: {
                                         player.position = model.start
+                                        // Bring focus back to hotkey handler after click
+                                        hotkeyHandler.forceActiveFocus()
                                     }
                                 }
                             }
@@ -278,6 +437,7 @@ ApplicationWindow {
                         }
 
                         ListView {
+                            focus: false
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             model: playlistModel
@@ -303,6 +463,7 @@ ApplicationWindow {
                                     hoverEnabled: true
                                     onDoubleClicked: {
                                         backend.loadVideo(model.path)
+                                        hotkeyHandler.forceActiveFocus()
                                     }
                                 }
                             }
