@@ -12,6 +12,7 @@ ApplicationWindow {
     height: config.windowHeight
     title: "MeowPot"
     color: "#1e1e1e"
+    flags: Qt.Window | Qt.FramelessWindowHint
 
     onClosing: {
         config.windowWidth = window.width;
@@ -36,6 +37,7 @@ ApplicationWindow {
 
     property bool rightPanelVisible: config.rightPanelVisible
     property bool controlBarVisible: true
+    property bool titleBarVisible: true
     property bool playlistVisible: config.playlistVisible
 
     Item {
@@ -115,10 +117,131 @@ ApplicationWindow {
         interval: 2000
         running: true
         onTriggered: {
+            // Keep control bar visible if hovered or combo box open
             if (controlBarHover.hovered || speedCombo.popup.visible) {
+                // do nothing for control bar, or we could separate the timers, but restarting here works
                 hideControlsTimer.restart()
             } else {
                 controlBarVisible = false
+            }
+
+            // Keep title bar visible if hovered
+            if (titleBarHover.hovered) {
+                hideControlsTimer.restart()
+            } else {
+                titleBarVisible = false
+            }
+        }
+    }
+
+    // --- Window Resize Handles ---
+    MouseArea { z: 100; width: 5; height: parent.height - 10; anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; cursorShape: Qt.SizeHorCursor; onPressed: window.startSystemResize(Qt.LeftEdge) }
+    MouseArea { z: 100; width: 5; height: parent.height - 10; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; cursorShape: Qt.SizeHorCursor; onPressed: window.startSystemResize(Qt.RightEdge) }
+    MouseArea { z: 100; width: parent.width - 10; height: 5; anchors.top: parent.top; anchors.horizontalCenter: parent.horizontalCenter; cursorShape: Qt.SizeVerCursor; onPressed: window.startSystemResize(Qt.TopEdge) }
+    MouseArea { z: 100; width: parent.width - 10; height: 5; anchors.bottom: parent.bottom; anchors.horizontalCenter: parent.horizontalCenter; cursorShape: Qt.SizeVerCursor; onPressed: window.startSystemResize(Qt.BottomEdge) }
+    MouseArea { z: 100; width: 10; height: 10; anchors.left: parent.left; anchors.top: parent.top; cursorShape: Qt.SizeFDiagCursor; onPressed: window.startSystemResize(Qt.TopLeftCorner) }
+    MouseArea { z: 100; width: 10; height: 10; anchors.right: parent.right; anchors.top: parent.top; cursorShape: Qt.SizeBDiagCursor; onPressed: window.startSystemResize(Qt.TopRightCorner) }
+    MouseArea { z: 100; width: 10; height: 10; anchors.left: parent.left; anchors.bottom: parent.bottom; cursorShape: Qt.SizeBDiagCursor; onPressed: window.startSystemResize(Qt.BottomLeftCorner) }
+    MouseArea { z: 100; width: 10; height: 10; anchors.right: parent.right; anchors.bottom: parent.bottom; cursorShape: Qt.SizeFDiagCursor; onPressed: window.startSystemResize(Qt.BottomRightCorner) }
+
+    // --- Title Bar Overlay ---
+    Rectangle {
+        id: titleBar
+        z: 100
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 48
+        color: Qt.rgba(0.12, 0.12, 0.14, 0.9)
+        opacity: window.titleBarVisible ? 1.0 : 0.0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.InOutQuad } }
+
+        HoverHandler {
+            id: titleBarHover
+            property point lastPos: Qt.point(-1, -1)
+            onPointChanged: {
+                if (Math.abs(point.position.x - lastPos.x) < 1 && Math.abs(point.position.y - lastPos.y) < 1) return;
+                lastPos = point.position;
+                window.titleBarVisible = true
+                hideControlsTimer.restart()
+            }
+        }
+
+        TapHandler {
+            onDoubleTapped: {
+                if (window.visibility === Window.FullScreen)
+                    window.visibility = Window.Windowed
+                else
+                    window.visibility = Window.FullScreen
+            }
+            onTapped: {
+                // startSystemMove requires pressed, not tapped, so we use MouseArea instead for dragging.
+            }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton
+            onPressed: window.startSystemMove()
+            onDoubleClicked: {
+                if (window.visibility === Window.FullScreen)
+                    window.visibility = Window.Windowed
+                else
+                    window.visibility = Window.FullScreen
+            }
+        }
+
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 15
+            anchors.rightMargin: 10
+            spacing: 10
+
+            Text {
+                text: "MeowPot 🐱"
+                color: "white"
+                font.pixelSize: 16
+                font.bold: true
+                Layout.fillWidth: true
+            }
+
+            Button {
+                Layout.preferredWidth: 32
+                Layout.preferredHeight: 32
+                focusPolicy: Qt.NoFocus
+                background: Rectangle { color: parent.down ? Qt.rgba(1, 1, 1, 0.2) : (parent.hovered ? Qt.rgba(1, 1, 1, 0.1) : "transparent"); radius: 16 }
+                onClicked: window.showMinimized()
+                contentItem: Item { Rectangle { width: 12; height: 2; color: "white"; anchors.centerIn: parent } }
+            }
+
+            Button {
+                Layout.preferredWidth: 32
+                Layout.preferredHeight: 32
+                focusPolicy: Qt.NoFocus
+                background: Rectangle { color: parent.down ? Qt.rgba(1, 1, 1, 0.2) : (parent.hovered ? Qt.rgba(1, 1, 1, 0.1) : "transparent"); radius: 16 }
+                onClicked: {
+                    if (window.visibility === Window.FullScreen || window.visibility === Window.Maximized)
+                        window.visibility = Window.Windowed
+                    else
+                        window.visibility = Window.Maximized
+                }
+                contentItem: Item { Rectangle { width: 12; height: 12; color: "transparent"; border.color: "white"; border.width: 1.5; anchors.centerIn: parent } }
+            }
+
+            Button {
+                Layout.preferredWidth: 32
+                Layout.preferredHeight: 32
+                focusPolicy: Qt.NoFocus
+                background: Rectangle { color: parent.down ? Qt.rgba(1, 0, 0, 0.7) : (parent.hovered ? Qt.rgba(1, 0, 0, 0.5) : "transparent"); radius: 16 }
+                onClicked: window.close()
+                contentItem: Canvas {
+                    anchors.fill: parent
+                    onPaint: {
+                        var ctx = getContext("2d"); ctx.strokeStyle = "white"; ctx.lineWidth = 1.5; ctx.beginPath();
+                        ctx.moveTo(11, 11); ctx.lineTo(21, 21); ctx.moveTo(21, 11); ctx.lineTo(11, 21); ctx.stroke();
+                    }
+                }
             }
         }
     }
@@ -143,7 +266,17 @@ ApplicationWindow {
                         if (Math.abs(point.position.x - lastPos.x) < 1 && Math.abs(point.position.y - lastPos.y) < 1) return;
                         lastPos = point.position;
                         window.controlBarVisible = true
+                        window.titleBarVisible = true
                         hideControlsTimer.restart()
+                    }
+                }
+
+                TapHandler {
+                    onDoubleTapped: {
+                        if (window.visibility === Window.FullScreen)
+                            window.visibility = Window.Windowed
+                        else
+                            window.visibility = Window.FullScreen
                     }
                 }
 
