@@ -43,9 +43,10 @@ class PlaylistModel(QAbstractListModel):
             files = [f for f in os.listdir(directory) if f.lower().endswith(video_extensions)]
             files.sort()
             for file in files:
+                full_path = os.path.normpath(os.path.join(directory, file))
                 self._playlist.append({
                     "name": file,
-                    "path": os.path.join(directory, file)
+                    "path": QUrl.fromLocalFile(full_path).toString()
                 })
         except FileNotFoundError:
             pass

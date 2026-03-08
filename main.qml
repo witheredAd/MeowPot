@@ -545,7 +545,7 @@ ApplicationWindow {
                             delegate: Rectangle {
                                 width: ListView.view.width
                                 height: 40
-                                color: ("file://" + model.path) === backend.currentVideoUrl.toString() ? "#007acc" : 
+                                color: (model.path === backend.currentVideoUrl.toString() || ("file://" + model.path) === backend.currentVideoUrl.toString()) ? "#007acc" : 
                                        mouseAreaPlay.containsMouse ? "#37373d" : "transparent"
 
                                 Text {
