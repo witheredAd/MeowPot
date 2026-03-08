@@ -2,7 +2,7 @@ import sys
 import os
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QHBoxLayout, QPushButton, QSlider, QLabel, QSplitter,
-                               QListWidget, QListWidgetItem, QFileDialog)
+                               QListWidget, QListWidgetItem, QFileDialog, QGridLayout)
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
 from PySide6.QtCore import Qt, QUrl, QTimer
@@ -26,6 +26,15 @@ class VideoPlayerWindow(QMainWindow):
         self.current_subtitles = []
         self.current_video_dir = ""
         self.is_fullscreen = False
+        
+        # New State for enhancements
+        import time
+        self.last_user_scroll_time = 0.0
+        self.base_playback_rate = 1.0
+        self.fast_forward_active = False
+        self.fast_backward_active = False
+        self.key_right_pressed = False
+        self.key_left_pressed = False
         
         self._setup_ui()
         self._connect_signals()
@@ -53,13 +62,20 @@ class VideoPlayerWindow(QMainWindow):
         # Video area
         left_layout.addWidget(self.video_widget, stretch=1)
         
+        # Dedicated subtitle container to prevent layout shifting
+        self.subtitle_container = QWidget()
+        self.subtitle_container.setFixedHeight(80) # Reserve sufficient fixed height
+        sub_layout = QVBoxLayout(self.subtitle_container)
+        
         # Subtitle overlay label
         self.subtitle_label = QLabel("")
-        self.subtitle_label.setAlignment(Qt.AlignCenter)
-        self.subtitle_label.setStyleSheet("color: white; background-color: rgba(0, 0, 0, 150); font-size: 24px; padding: 10px;")
-        self.subtitle_label.setWordWrap(True)
+        self.subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.subtitle_label.setStyleSheet("color: white; background-color: rgba(50, 50, 50, 180); font-size: 24px; border-radius: 8px;")
+        # self.subtitle_label.setWordWrap(True)
         self.subtitle_label.hide()
-        left_layout.addWidget(self.subtitle_label)
+        
+        sub_layout.addWidget(self.subtitle_label, alignment=Qt.AlignmentFlag.AlignCenter)
+        left_layout.addWidget(self.subtitle_container)
         
         # Controls area
         self.controls_widget = QWidget()
@@ -78,6 +94,12 @@ class VideoPlayerWindow(QMainWindow):
         
         self.btn_fullscreen = QPushButton("Fullscreen")
         controls_layout.addWidget(self.btn_fullscreen)
+        
+        from PySide6.QtWidgets import QComboBox
+        self.combo_speed = QComboBox()
+        self.combo_speed.addItems(["1.0x", "1.5x", "2.0x", "2.5x", "3.0x"])
+        self.combo_speed.setCurrentIndex(0)
+        controls_layout.addWidget(self.combo_speed)
         
         self.btn_open = QPushButton("Open File")
         controls_layout.addWidget(self.btn_open)
@@ -134,6 +156,9 @@ class VideoPlayerWindow(QMainWindow):
         
         self.list_playlist.itemDoubleClicked.connect(self.playlist_item_double_clicked)
         self.list_subtitles.itemClicked.connect(self.subtitle_item_clicked)
+        
+        self.combo_speed.currentTextChanged.connect(self.speed_changed)
+        self.list_subtitles.verticalScrollBar().actionTriggered.connect(self.user_scrolled)
         
     def open_file(self):
         file_dialog = QFileDialog()
@@ -203,6 +228,7 @@ class VideoPlayerWindow(QMainWindow):
     def playback_state_changed(self, state):
         if state == QMediaPlayer.PlayingState:
             self.btn_play_pause.setText("Pause")
+            self.last_user_scroll_time = 0.0 # Force scroll immediately upon resume
         else:
             self.btn_play_pause.setText("Play")
             
@@ -252,10 +278,17 @@ class VideoPlayerWindow(QMainWindow):
             if active_index != -1:
                 item = self.list_subtitles.item(active_index)
                 if item:
-                    # Scroll minimally to keep item in view
-                    # We can use ensureWidgetVisible or similar, scrollToItem handles it well if we don't force too much
-                    # For a smoother experience, only scroll if it's out of view, QListWidget handles it
-                    self.list_subtitles.scrollToItem(item)
+                    import time
+                    current_time = time.time()
+                    should_scroll = False
+                    
+                    if self.media_player.playbackState() == QMediaPlayer.PlayingState:
+                        if (current_time - self.last_user_scroll_time) > 8.0:
+                            should_scroll = True
+                            
+                    if should_scroll:
+                        self.list_subtitles.scrollToItem(item)
+                        
                     for i in range(self.list_subtitles.count()):
                         list_item = self.list_subtitles.item(i)
                         if i == active_index:
@@ -282,18 +315,83 @@ class VideoPlayerWindow(QMainWindow):
             self.controls_widget.show()
             self.is_fullscreen = False
 
+
     def toggle_right_panel(self):
         if self.right_panel.isVisible():
             self.right_panel.hide()
         else:
             self.right_panel.show()
 
+    def speed_changed(self, text):
+        import re
+        match = re.search(r"(\d+\.\d+)", text)
+        if match:
+            self.base_playback_rate = float(match.group(1))
+            if not self.fast_forward_active and not self.fast_backward_active:
+                self.media_player.setPlaybackRate(self.base_playback_rate)
+
+    def user_scrolled(self, action):
+        import time
+        self.last_user_scroll_time = time.time()
+
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Escape and self.is_fullscreen:
+        if event.key() in (Qt.Key.Key_Left, Qt.Key.Key_Right) and event.isAutoRepeat():
+            return
+
+        if event.isAutoRepeat():
+            super().keyPressEvent(event)
+            return
+
+        if event.key() == Qt.Key.Key_Escape and self.is_fullscreen:
             self.toggle_fullscreen()
-        elif event.key() == Qt.Key_Space:
+        elif event.key() == Qt.Key.Key_Space:
             self.toggle_playback()
-        super().keyPressEvent(event)
+        elif event.key() == Qt.Key.Key_Right:
+            self.key_right_pressed = True
+            QTimer.singleShot(300, self._check_fast_forward)
+        elif event.key() == Qt.Key.Key_Left:
+            self.key_left_pressed = True
+            QTimer.singleShot(300, self._check_fast_backward)
+        else:
+            super().keyPressEvent(event)
+
+    def _check_fast_forward(self):
+        if self.key_right_pressed:
+            self.fast_forward_active = True
+            self.media_player.setPlaybackRate(self.base_playback_rate + 2.0)
+
+    def _check_fast_backward(self):
+        if self.key_left_pressed:
+            self.fast_backward_active = True
+            # Assuming QT's implementation supports negative rate, if not it will fallback to normal or skip
+            self.media_player.setPlaybackRate(-(self.base_playback_rate + 2.0))
+
+    def keyReleaseEvent(self, event):
+        if event.key() in (Qt.Key.Key_Left, Qt.Key.Key_Right) and event.isAutoRepeat():
+            return
+
+        if event.isAutoRepeat():
+            super().keyReleaseEvent(event)
+            return
+            
+        if event.key() == Qt.Key.Key_Right:
+            self.key_right_pressed = False
+            if self.fast_forward_active:
+                self.fast_forward_active = False
+                self.media_player.setPlaybackRate(self.base_playback_rate)
+            else:
+                pos = self.media_player.position()
+                self.media_player.setPosition(pos + 10000)
+        elif event.key() == Qt.Key.Key_Left:
+            self.key_left_pressed = False
+            if self.fast_backward_active:
+                self.fast_backward_active = False
+                self.media_player.setPlaybackRate(self.base_playback_rate)
+            else:
+                pos = max(0, self.media_player.position() - 10000)
+                self.media_player.setPosition(pos)
+        else:
+            super().keyReleaseEvent(event)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
