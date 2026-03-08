@@ -104,7 +104,7 @@ ApplicationWindow {
         interval: 2000
         running: true
         onTriggered: {
-            if (controlBarHover.hovered) {
+            if (controlBarHover.hovered || speedCombo.popup.visible) {
                 hideControlsTimer.restart()
             } else {
                 controlBarVisible = false
@@ -187,16 +187,17 @@ ApplicationWindow {
                 // Controls Area
                 Rectangle {
                     anchors.bottom: parent.bottom
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    height: 60
-                    color: Qt.rgba(0.145, 0.145, 0.149, 0.85) // Transparent dark background
-                    border.color: "#333333"
+                    anchors.bottomMargin: 24
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: Math.min(800, parent.width - 48)
+                    height: 64
+                    radius: 32
+                    color: Qt.rgba(0.12, 0.12, 0.14, 0.9) // Floating dark background
+                    border.color: Qt.rgba(1, 1, 1, 0.1)
                     border.width: 1
                     opacity: window.controlBarVisible ? 1.0 : 0.0
                     visible: opacity > 0
-                    Behavior on opacity { NumberAnimation { duration: 300 } }
-
+                    Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.InOutQuad } }
 
                     HoverHandler {
                         id: controlBarHover
@@ -211,14 +212,23 @@ ApplicationWindow {
 
                     RowLayout {
                         anchors.fill: parent
-                        anchors.margins: 10
+                        anchors.leftMargin: 20
+                        anchors.rightMargin: 20
                         spacing: 15
 
                         Button {
-                            Layout.preferredWidth: 32
-                            Layout.preferredHeight: 32
+                            id: playPauseBtn
+                            Layout.preferredWidth: 40
+                            Layout.preferredHeight: 40
                             focusPolicy: Qt.NoFocus
                             padding: 0
+                            
+                            background: Rectangle {
+                                radius: 20
+                                color: playPauseBtn.down ? Qt.rgba(1, 1, 1, 0.2) : (playPauseBtn.hovered ? Qt.rgba(1, 1, 1, 0.1) : "transparent")
+                                Behavior on color { ColorAnimation { duration: 150 } }
+                            }
+                            
                             onClicked: {
                                 if (player.playbackState === MediaPlayer.PlayingState)
                                     player.pause()
@@ -247,16 +257,17 @@ ApplicationWindow {
                                     visible: false
                                     onPaint: {
                                         var ctx = getContext("2d"); ctx.fillStyle = "white"; ctx.beginPath();
-                                        ctx.moveTo(10, 8); ctx.lineTo(24, 16); ctx.lineTo(10, 24); ctx.fill();
+                                        // Draw smooth triangle
+                                        ctx.moveTo(14, 11); ctx.lineTo(28, 20); ctx.lineTo(14, 29); ctx.fill();
                                     }
                                 }
                                 Row {
                                     id: pauseRects
                                     anchors.centerIn: parent
-                                    spacing: 4
+                                    spacing: 5
                                     visible: false
-                                    Rectangle { width: 4; height: 16; color: "white" }
-                                    Rectangle { width: 4; height: 16; color: "white" }
+                                    Rectangle { width: 4; height: 16; color: "white"; radius: 2 }
+                                    Rectangle { width: 4; height: 16; color: "white"; radius: 2 }
                                 }
                             }
                         }
@@ -273,13 +284,36 @@ ApplicationWindow {
 
                         Text {
                             text: formatTime(player.position) + " / " + formatTime(player.duration)
-                            color: "#cccccc"
+                            color: "#dddddd"
+                            font.pixelSize: 13
+                            font.weight: Font.Medium
                         }
 
                         ComboBox {
                             id: speedCombo
                             focusPolicy: Qt.NoFocus
+                            Layout.preferredWidth: 80
+                            Layout.preferredHeight: 40
                             model: ["1.0x", "1.5x", "2.0x", "2.5x", "3.0x"]
+                            
+                            contentItem: Text {
+                                leftPadding: 10
+                                text: speedCombo.displayText
+                                font: speedCombo.font
+                                color: "#dddddd"
+                                verticalAlignment: Text.AlignVCenter
+                                horizontalAlignment: Text.AlignHCenter
+                                elide: Text.ElideNone
+                            }
+                            
+                            background: Rectangle {
+                                implicitWidth: 80
+                                implicitHeight: 40
+                                color: speedCombo.pressed ? Qt.rgba(1, 1, 1, 0.2) : (speedCombo.hovered ? Qt.rgba(1, 1, 1, 0.1) : "transparent")
+                                radius: 20
+                                Behavior on color { ColorAnimation { duration: 150 } }
+                            }
+                            
                             onCurrentTextChanged: {
                                 let match = currentText.match(/(\d+\.\d+)/);
                                 if (match && !hotkeyHandler.rightPressed && !hotkeyHandler.leftPressed) {
@@ -289,23 +323,35 @@ ApplicationWindow {
                         }
 
                         Button {
-                            Layout.preferredWidth: 32
-                            Layout.preferredHeight: 32
+                            id: fileBtn
+                            Layout.preferredWidth: 40
+                            Layout.preferredHeight: 40
                             focusPolicy: Qt.NoFocus
                             padding: 0
+                            background: Rectangle {
+                                radius: 20
+                                color: fileBtn.down ? Qt.rgba(1, 1, 1, 0.2) : (fileBtn.hovered ? Qt.rgba(1, 1, 1, 0.1) : "transparent")
+                                Behavior on color { ColorAnimation { duration: 150 } }
+                            }
                             onClicked: fileDialog.open()
                             contentItem: Item {
                                 anchors.fill: parent
-                                Rectangle { x: 6; y: 8; width: 8; height: 3; color: "white"; radius: 1 }
-                                Rectangle { x: 6; y: 10; width: 20; height: 14; color: "white"; radius: 2 }
+                                Rectangle { x: 10; y: 12; width: 8; height: 3; color: "white"; radius: 1 }
+                                Rectangle { x: 10; y: 14; width: 20; height: 14; color: "white"; radius: 2 }
                             }
                         }
 
                         Button {
-                            Layout.preferredWidth: 32
-                            Layout.preferredHeight: 32
+                            id: rightPanelBtn
+                            Layout.preferredWidth: 40
+                            Layout.preferredHeight: 40
                             focusPolicy: Qt.NoFocus
                             padding: 0
+                            background: Rectangle {
+                                radius: 20
+                                color: rightPanelBtn.down ? Qt.rgba(1, 1, 1, 0.2) : (rightPanelBtn.hovered ? Qt.rgba(1, 1, 1, 0.1) : "transparent")
+                                Behavior on color { ColorAnimation { duration: 150 } }
+                            }
                             onClicked: window.rightPanelVisible = !window.rightPanelVisible
                             contentItem: Canvas {
                                 id: toggleRightPanelCanvas
@@ -317,9 +363,9 @@ ApplicationWindow {
                                 onPaint: {
                                     var ctx = getContext("2d"); ctx.clearRect(0,0,width,height); ctx.fillStyle = "white"; ctx.beginPath();
                                     if (window.rightPanelVisible) {
-                                        ctx.moveTo(20, 10); ctx.lineTo(12, 16); ctx.lineTo(20, 22);
+                                        ctx.moveTo(16, 14); ctx.lineTo(24, 20); ctx.lineTo(16, 26);
                                     } else {
-                                        ctx.moveTo(12, 10); ctx.lineTo(20, 16); ctx.lineTo(12, 22);
+                                        ctx.moveTo(24, 14); ctx.lineTo(16, 20); ctx.lineTo(24, 26);
                                     }
                                     ctx.fill()
                                 }
