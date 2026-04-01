@@ -283,7 +283,10 @@ ApplicationWindow {
                 MediaPlayer {
                         id: player
                         source: backend.currentVideoUrl
-                        audioOutput: AudioOutput {}
+                        audioOutput: AudioOutput {
+                            id: audioOut
+                            volume: volumeSlider.value
+                        }
                         videoOutput: videoOutput
                         property bool positionRestored: false
 
@@ -313,6 +316,15 @@ ApplicationWindow {
                     }
 
                     // Native, perfect Subtitle Overlay!
+                    // Hidden helper to measure natural (unconstrained) text width
+                    Text {
+                        id: subtitleMeasure
+                        visible: false
+                        text: backend.currentSubtitleText
+                        font.pixelSize: 24
+                        wrapMode: Text.NoWrap
+                    }
+
                     Rectangle {
                         id: subtitleOverlay
                         visible: backend.currentSubtitleText !== ""
@@ -320,20 +332,24 @@ ApplicationWindow {
                         anchors.bottomMargin: window.controlBarVisible ? 90 : 30
                         Behavior on anchors.bottomMargin { NumberAnimation { duration: 300 } }
                         anchors.horizontalCenter: parent.horizontalCenter
-                        width: Math.min(subtitleText.paintedWidth + 40, parent.width - 40)
-                        height: subtitleText.paintedHeight + 20
+                        property real maxW: parent.width - 80
+                        width: Math.min(subtitleMeasure.contentWidth + 40, maxW)
+                        height: subtitleText.contentHeight + 20
                         color: Qt.rgba(0.2, 0.2, 0.2, 0.7)
                         radius: 8
 
-                        Text {
+                        TextEdit {
                             id: subtitleText
                             anchors.centerIn: parent
                             text: backend.currentSubtitleText
                             color: "white"
                             font.pixelSize: 24
-                            horizontalAlignment: Text.AlignHCenter
-                            wrapMode: Text.WordWrap
-                            width: parent.width - 40
+                            horizontalAlignment: TextEdit.AlignHCenter
+                            wrapMode: TextEdit.WordWrap
+                            width: subtitleOverlay.width - 40
+                            readOnly: true
+                            selectByMouse: true
+                            selectionColor: "#007acc"
                         }
                     }
 
@@ -440,6 +456,61 @@ ApplicationWindow {
                             color: "#dddddd"
                             font.pixelSize: 13
                             font.weight: Font.Medium
+                        }
+
+                        Button {
+                            id: volumeBtn
+                            Layout.preferredWidth: 32
+                            Layout.preferredHeight: 32
+                            focusPolicy: Qt.NoFocus
+                            padding: 0
+                            background: Rectangle {
+                                radius: 16
+                                color: volumeBtn.down ? Qt.rgba(1, 1, 1, 0.2) : (volumeBtn.hovered ? Qt.rgba(1, 1, 1, 0.1) : "transparent")
+                                Behavior on color { ColorAnimation { duration: 150 } }
+                            }
+                            onClicked: {
+                                audioOut.muted = !audioOut.muted
+                            }
+                            contentItem: Canvas {
+                                anchors.fill: parent
+                                Connections {
+                                    target: audioOut
+                                    function onMutedChanged() { parent.requestPaint() }
+                                    function onVolumeChanged() { parent.requestPaint() }
+                                }
+                                onPaint: {
+                                    var ctx = getContext("2d"); ctx.clearRect(0,0,width,height);
+                                    ctx.fillStyle = "white"; ctx.beginPath();
+                                    ctx.moveTo(8, 12); ctx.lineTo(12, 12); ctx.lineTo(16, 8);
+                                    ctx.lineTo(16, 24); ctx.lineTo(12, 20); ctx.lineTo(8, 20);
+                                    ctx.fill();
+                                    if (audioOut.muted || audioOut.volume === 0) {
+                                        ctx.strokeStyle = "red"; ctx.lineWidth = 2; ctx.beginPath();
+                                        ctx.moveTo(18, 12); ctx.lineTo(24, 18);
+                                        ctx.moveTo(24, 12); ctx.lineTo(18, 18);
+                                        ctx.stroke();
+                                    } else {
+                                        ctx.strokeStyle = "white"; ctx.lineWidth = 1.5; ctx.beginPath();
+                                        ctx.arc(14, 16, 5, -Math.PI/3, Math.PI/3);
+                                        ctx.stroke();
+                                        if (audioOut.volume > 0.5) {
+                                            ctx.beginPath();
+                                            ctx.arc(14, 16, 8, -Math.PI/3, Math.PI/3);
+                                            ctx.stroke();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Slider {
+                            id: volumeSlider
+                            focusPolicy: Qt.NoFocus
+                            Layout.preferredWidth: 60
+                            from: 0
+                            to: 1
+                            value: 1.0
                         }
 
                         ComboBox {
